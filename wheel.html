@@ -18,6 +18,50 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     box-sizing: border-box;
   }
+  h1 {
+    font-size: 22px;
+    margin: 0 0 0.5rem 0;
+    color: #2b2b2b;
+    text-align: center;
+  }
+
+  /* Selection screen */
+  #selectScreen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+  }
+  #selectScreen p {
+    color: #555;
+    margin: 0;
+    font-size: 15px;
+  }
+  .choice-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .choice-btn {
+    font-size: 17px;
+    padding: 18px 32px;
+    font-weight: 700;
+    border-radius: 14px;
+    border: 2px solid #d97757;
+    background: white;
+    color: #d97757;
+    cursor: pointer;
+    min-width: 160px;
+  }
+  .choice-btn:hover {
+    background: #fdf1ea;
+  }
+  .choice-btn.friends { border-color: #7c66d9; color: #7c66d9; }
+  .choice-btn.friends:hover { background: #f1eefb; }
+
+  /* Wheel screen */
+  #wheelScreen { display: none; flex-direction: column; align-items: center; gap: 1rem; }
   .wheel-wrap {
     position: relative;
     width: 360px;
@@ -46,7 +90,7 @@
     border: 1px solid #ddd8d0;
     box-shadow: 0 4px 16px rgba(0,0,0,0.12);
   }
-  button {
+  button.action {
     font-size: 16px;
     padding: 10px 28px;
     font-weight: 600;
@@ -56,8 +100,19 @@
     color: white;
     cursor: pointer;
   }
-  button:hover { background: #c2663f; }
-  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  button.action:hover { background: #c2663f; }
+  button.action:disabled { opacity: 0.6; cursor: not-allowed; }
+  #backBtn {
+    background: transparent;
+    color: #888;
+    border: 1px solid #ccc;
+    font-weight: 500;
+    font-size: 13px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  #backBtn:hover { background: #f2f0ec; }
   #resultBox {
     min-height: 28px;
     font-size: 18px;
@@ -65,15 +120,8 @@
     color: #b45309;
     text-align: center;
   }
-  details {
-    width: 100%;
-    max-width: 420px;
-  }
-  summary {
-    cursor: pointer;
-    font-size: 14px;
-    color: #555;
-  }
+  details { width: 100%; max-width: 420px; }
+  summary { cursor: pointer; font-size: 14px; color: #555; }
   #nameInputs {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -86,44 +134,57 @@
     border-radius: 6px;
     border: 1px solid #ccc;
   }
-  #applyBtn {
-    margin-top: 12px;
-    font-size: 14px;
-    padding: 8px 20px;
-  }
+  #applyBtn { margin-top: 12px; font-size: 14px; padding: 8px 20px; }
 </style>
 </head>
 <body>
 
-  <h1 style="font-size:20px; margin:0 0 0.5rem 0; color:#2b2b2b;">Prize Wheel</h1>
+  <h1>Prize Wheel</h1>
 
-  <div class="wheel-wrap">
-    <div class="pointer"></div>
-    <canvas id="wheel" width="360" height="360"></canvas>
+  <!-- Selection screen -->
+  <div id="selectScreen">
+    <p>Who's this spin for?</p>
+    <div class="choice-row">
+      <button class="choice-btn friends" id="friendsBtn">Friends only</button>
+      <button class="choice-btn" id="classBtn">Whole Class</button>
+    </div>
   </div>
 
-  <button id="spinBtn">▶ Spin the wheel</button>
+  <!-- Wheel screen -->
+  <div id="wheelScreen">
+    <button id="backBtn">&larr; Back to selection</button>
 
-  <div id="resultBox"></div>
+    <div class="wheel-wrap">
+      <div class="pointer"></div>
+      <canvas id="wheel" width="360" height="360"></canvas>
+    </div>
 
-  <details>
-    <summary>Edit names (21 slots)</summary>
-    <div id="nameInputs"></div>
-    <button id="applyBtn">✓ Apply names</button>
-  </details>
+    <button class="action" id="spinBtn">&#9654; Spin the wheel</button>
+
+    <div id="resultBox"></div>
+
+    <details>
+      <summary>Edit names</summary>
+      <div id="nameInputs"></div>
+      <button class="action" id="applyBtn">&#10003; Apply names</button>
+    </details>
+  </div>
 
 <script>
 (function(){
-  var defaultNames = ["Hooriya","Arielle","Shrinika","Natalia","Lincoln","Michael","Sophia",
-    "Arisha","Ashton","Liam","Luke","Carter","Lucy","Prisha","Theo","Garret","Agastya",
-    "Morgan","Belle","Kynlee","William"];
+  var nameSets = {
+    friends: ["Arisha","Sophia","Shrinika","Hooriya"],
+    class: ["Hooriya","Arielle","Shrinika","Natalia","Lincoln","Michael","Sophia",
+      "Arisha","Ashton","Liam","Luke","Carter","Lucy","Prisha","Theo","Garret","Agastya",
+      "Morgan","Belle","Kynlee","William"]
+  };
 
-  // Hard-coded hex colors (no CSS theme variables here — this file has to
-  // stand on its own with no host page defining them).
+  // Hard-coded hex colors — no CSS theme variables, this file has to stand
+  // on its own with nothing else defining them.
   var sliceFills = ["#CECBF6","#9FE1CB","#F5C4B3","#F4C0D1","#FAC775"];
   var sliceTextColors = ["#3C3489","#085041","#712B13","#72243E","#633806"];
 
-  var names = defaultNames.slice();
+  var names = [];
   var canvas = document.getElementById('wheel');
   var ctx = canvas.getContext('2d');
   var size = 360, cx = size/2, cy = size/2, r = size/2 - 6;
@@ -136,7 +197,7 @@
   function buildInputs(){
     var container = document.getElementById('nameInputs');
     container.innerHTML = '';
-    for (var i=0;i<21;i++){
+    for (var i=0;i<names.length;i++){
       var inp = document.createElement('input');
       inp.type = 'text';
       inp.value = names[i];
@@ -149,6 +210,7 @@
     ctx.clearRect(0,0,size,size);
     var n = names.length;
     var slice = (2*Math.PI)/n;
+    var fontSize = n > 8 ? 11 : 15;
     for (var i=0;i<n;i++){
       var start = rotation + i*slice;
       var end = start + slice;
@@ -170,7 +232,7 @@
       ctx.rotate(start + slice/2);
       ctx.textAlign = 'right';
       ctx.fillStyle = textColor;
-      ctx.font = '600 11px -apple-system, sans-serif';
+      ctx.font = '600 ' + fontSize + 'px -apple-system, sans-serif';
       ctx.fillText(names[i], r - 10, 4);
       ctx.restore();
     }
@@ -221,12 +283,30 @@
         spinning = false;
         document.getElementById('spinBtn').disabled = false;
         var winnerIdx = indexUnderPointer(currentRotation);
-        document.getElementById('resultBox').innerHTML = '🎉 ' + names[winnerIdx] + ' wins the prize!';
+        document.getElementById('resultBox').innerHTML = '&#127881; ' + names[winnerIdx] + ' wins the prize!';
       }
     }
     requestAnimationFrame(frame);
   }
 
+  function openWheel(setKey){
+    names = nameSets[setKey].slice();
+    currentRotation = 0;
+    document.getElementById('resultBox').textContent = '';
+    document.getElementById('selectScreen').style.display = 'none';
+    document.getElementById('wheelScreen').style.display = 'flex';
+    buildInputs();
+    drawWheel(currentRotation);
+  }
+
+  function backToSelect(){
+    document.getElementById('wheelScreen').style.display = 'none';
+    document.getElementById('selectScreen').style.display = 'flex';
+  }
+
+  document.getElementById('friendsBtn').addEventListener('click', function(){ openWheel('friends'); });
+  document.getElementById('classBtn').addEventListener('click', function(){ openWheel('class'); });
+  document.getElementById('backBtn').addEventListener('click', backToSelect);
   document.getElementById('spinBtn').addEventListener('click', spin);
   document.getElementById('applyBtn').addEventListener('click', function(){
     var inputs = document.querySelectorAll('#nameInputs input');
@@ -237,9 +317,6 @@
     names = newNames;
     drawWheel(currentRotation);
   });
-
-  buildInputs();
-  drawWheel(currentRotation);
 })();
 </script>
 </body>
