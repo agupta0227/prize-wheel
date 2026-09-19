@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prize Spinning Wheel</title>
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 2rem 1rem;
+    background: #faf8f5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    box-sizing: border-box;
+  }
+  .wheel-wrap {
+    position: relative;
+    width: 360px;
+    height: 360px;
+    max-width: 90vw;
+    max-height: 90vw;
+  }
+  .pointer {
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 22px solid #2b2b2b;
+    z-index: 2;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25));
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 1px solid #ddd8d0;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  }
+  button {
+    font-size: 16px;
+    padding: 10px 28px;
+    font-weight: 600;
+    border-radius: 999px;
+    border: none;
+    background: #d97757;
+    color: white;
+    cursor: pointer;
+  }
+  button:hover { background: #c2663f; }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  #resultBox {
+    min-height: 28px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #b45309;
+    text-align: center;
+  }
+  details {
+    width: 100%;
+    max-width: 420px;
+  }
+  summary {
+    cursor: pointer;
+    font-size: 14px;
+    color: #555;
+  }
+  #nameInputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  #nameInputs input {
+    font-size: 13px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+  }
+  #applyBtn {
+    margin-top: 12px;
+    font-size: 14px;
+    padding: 8px 20px;
+  }
+</style>
+</head>
+<body>
+
+  <h1 style="font-size:20px; margin:0 0 0.5rem 0; color:#2b2b2b;">Prize Wheel</h1>
+
+  <div class="wheel-wrap">
+    <div class="pointer"></div>
+    <canvas id="wheel" width="360" height="360"></canvas>
+  </div>
+
+  <button id="spinBtn">▶ Spin the wheel</button>
+
+  <div id="resultBox"></div>
+
+  <details>
+    <summary>Edit names (21 slots)</summary>
+    <div id="nameInputs"></div>
+    <button id="applyBtn">✓ Apply names</button>
+  </details>
+
+<script>
+(function(){
+  var defaultNames = ["Hooriya","Arielle","Shrinika","Natalia","Lincoln","Michael","Sophia",
+    "Arisha","Ashton","Liam","Luke","Carter","Lucy","Prisha","Theo","Garret","Agastya",
+    "Morgan","Belle","Kynlee","William"];
+
+  // Hard-coded hex colors (no CSS theme variables here — this file has to
+  // stand on its own with no host page defining them).
+  var sliceFills = ["#CECBF6","#9FE1CB","#F5C4B3","#F4C0D1","#FAC775"];
+  var sliceTextColors = ["#3C3489","#085041","#712B13","#72243E","#633806"];
+
+  var names = defaultNames.slice();
+  var canvas = document.getElementById('wheel');
+  var ctx = canvas.getContext('2d');
+  var size = 360, cx = size/2, cy = size/2, r = size/2 - 6;
+  var currentRotation = 0;
+  var spinning = false;
+  var POINTER_ANGLE = -Math.PI/2;
+
+  function mod(a,m){ return ((a % m) + m) % m; }
+
+  function buildInputs(){
+    var container = document.getElementById('nameInputs');
+    container.innerHTML = '';
+    for (var i=0;i<21;i++){
+      var inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = names[i];
+      inp.setAttribute('data-idx', i);
+      container.appendChild(inp);
+    }
+  }
+
+  function drawWheel(rotation){
+    ctx.clearRect(0,0,size,size);
+    var n = names.length;
+    var slice = (2*Math.PI)/n;
+    for (var i=0;i<n;i++){
+      var start = rotation + i*slice;
+      var end = start + slice;
+      var fill = sliceFills[i % sliceFills.length];
+      var textColor = sliceTextColors[i % sliceTextColors.length];
+
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.arc(cx,cy,r,start,end);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(cx,cy);
+      ctx.rotate(start + slice/2);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = textColor;
+      ctx.font = '600 11px -apple-system, sans-serif';
+      ctx.fillText(names[i], r - 10, 4);
+      ctx.restore();
+    }
+    ctx.beginPath();
+    ctx.arc(cx,cy,r,0,2*Math.PI);
+    ctx.strokeStyle = '#c9c2b8';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  function indexUnderPointer(rotation){
+    var n = names.length;
+    var slice = (2*Math.PI)/n;
+    var rel = mod(POINTER_ANGLE - rotation, 2*Math.PI);
+    var i = Math.floor(rel/slice);
+    if (i >= n) i = n-1;
+    if (i < 0) i = 0;
+    return i;
+  }
+
+  function easeOutCubic(t){ return 1 - Math.pow(1-t,3); }
+
+  function spin(){
+    if (spinning) return;
+    spinning = true;
+    document.getElementById('spinBtn').disabled = true;
+    document.getElementById('resultBox').textContent = '';
+    var extraSpins = 5 + Math.random()*2;
+    var randomOffset = Math.random()*2*Math.PI;
+    var startRotation = currentRotation;
+    var delta = extraSpins*2*Math.PI + randomOffset;
+    var targetRotation = startRotation + delta;
+    var duration = 4200;
+    var startTime = null;
+
+    function frame(ts){
+      if (!startTime) startTime = ts;
+      var elapsed = ts - startTime;
+      var t = Math.min(elapsed/duration, 1);
+      var eased = easeOutCubic(t);
+      currentRotation = startRotation + delta*eased;
+      drawWheel(currentRotation);
+      if (t < 1){
+        requestAnimationFrame(frame);
+      } else {
+        currentRotation = targetRotation;
+        drawWheel(currentRotation);
+        spinning = false;
+        document.getElementById('spinBtn').disabled = false;
+        var winnerIdx = indexUnderPointer(currentRotation);
+        document.getElementById('resultBox').innerHTML = '🎉 ' + names[winnerIdx] + ' wins the prize!';
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  document.getElementById('spinBtn').addEventListener('click', spin);
+  document.getElementById('applyBtn').addEventListener('click', function(){
+    var inputs = document.querySelectorAll('#nameInputs input');
+    var newNames = [];
+    inputs.forEach(function(inp){
+      newNames.push(inp.value.trim() || 'Player');
+    });
+    names = newNames;
+    drawWheel(currentRotation);
+  });
+
+  buildInputs();
+  drawWheel(currentRotation);
+})();
+</script>
+</body>
+</html>
